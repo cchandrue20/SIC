@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import Link from 'next/link';
+import ReviewForm from '@/components/ReviewForm';
 
 export default function ConnectionsPage() {
   const { user } = useAuth();
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchConnections = async () => {
@@ -63,34 +65,55 @@ export default function ConnectionsPage() {
                 : { name: conn.startup?.companyName || 'Startup', sub: conn.startup?.location };
 
               return (
-                <div key={conn._id} className="glass-hover p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-slide-up" style={{ animationDelay: `${i * 0.05}s` }}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-600 to-accent-600 flex items-center justify-center text-white font-bold flex-shrink-0">
-                      {otherParty.name.charAt(0).toUpperCase()}
+                <div key={conn._id} className="animate-slide-up" style={{ animationDelay: `${i * 0.05}s` }}>
+                  <div className="glass-hover p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-600 to-accent-600 flex items-center justify-center text-white font-bold flex-shrink-0">
+                        {otherParty.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium">{otherParty.name}</p>
+                        <p className="text-sm text-surface-400 capitalize">{otherParty.sub}</p>
+                        {conn.initialMessage && (
+                          <p className="text-xs text-surface-500 mt-1 truncate max-w-xs">&ldquo;{conn.initialMessage}&rdquo;</p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{otherParty.name}</p>
-                      <p className="text-sm text-surface-400 capitalize">{otherParty.sub}</p>
-                      {conn.initialMessage && (
-                        <p className="text-xs text-surface-500 mt-1 truncate max-w-xs">&ldquo;{conn.initialMessage}&rdquo;</p>
+                    <div className="flex items-center gap-2">
+                      <span className={
+                        conn.status === 'pending' ? 'status-pending' :
+                        conn.status === 'accepted' ? 'status-accepted' :
+                        conn.status === 'rejected' ? 'status-rejected' :
+                        'status-badge bg-surface-500/10 text-surface-400 border border-surface-500/20'
+                      }>
+                        {conn.status}
+                      </span>
+                      {conn.status === 'accepted' && (
+                        <>
+                          <Link href={`/connections/${conn._id}`} className="btn-primary text-xs px-4 py-2">
+                            💬 Chat
+                          </Link>
+                          <button
+                            onClick={() => setReviewingId(reviewingId === conn._id ? null : conn._id)}
+                            className="btn-secondary text-xs px-3 py-2"
+                            id={`review-btn-${conn._id}`}
+                          >
+                            ⭐ Review
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={
-                      conn.status === 'pending' ? 'status-pending' :
-                      conn.status === 'accepted' ? 'status-accepted' :
-                      conn.status === 'rejected' ? 'status-rejected' :
-                      'status-badge bg-surface-500/10 text-surface-400 border border-surface-500/20'
-                    }>
-                      {conn.status}
-                    </span>
-                    {conn.status === 'accepted' && (
-                      <Link href={`/connections/${conn._id}`} className="btn-primary text-xs px-4 py-2">
-                        💬 Chat
-                      </Link>
-                    )}
-                  </div>
+                  {/* Review Form (expandable) */}
+                  {reviewingId === conn._id && (
+                    <div className="mt-2 p-5 glass rounded-xl animate-slide-down">
+                      <h4 className="text-sm font-semibold mb-3">Leave a Review for {otherParty.name}</h4>
+                      <ReviewForm
+                        connectionId={conn._id}
+                        onReviewSubmitted={() => setReviewingId(null)}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

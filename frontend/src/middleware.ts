@@ -6,7 +6,16 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public paths – always accessible
-  const publicPaths = ['/', '/login', '/register', '/browse'];
+  const publicPaths = [
+    '/',
+    '/login',
+    '/register',
+    '/browse',
+    '/forgot-password',
+    '/reset-password',
+    '/profile/startup',
+    '/profile/supporter',
+  ];
   const isPublic = publicPaths.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );

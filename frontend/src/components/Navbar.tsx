@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useState } from 'react';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function Navbar() {
   const { user, logout, loading } = useAuth();
@@ -39,6 +40,11 @@ export default function Navbar() {
                 <Link href="/connections" className="px-4 py-2 rounded-lg text-sm text-surface-300 hover:text-white hover:bg-white/5 transition-all">
                   Connections
                 </Link>
+                {user.role === 'admin' && (
+                  <Link href="/admin/analytics" className="px-4 py-2 rounded-lg text-sm text-surface-300 hover:text-white hover:bg-white/5 transition-all">
+                    Analytics
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -49,6 +55,7 @@ export default function Navbar() {
               <div className="w-20 h-9 rounded-lg bg-white/5 animate-pulse" />
             ) : user ? (
               <div className="flex items-center gap-3">
+                <NotificationBell />
                 <span className="text-sm text-surface-400">
                   {user.email}
                   <span className="ml-1.5 status-badge bg-primary-500/10 text-primary-400 border border-primary-500/20">
@@ -102,6 +109,11 @@ export default function Navbar() {
                   <Link href="/connections" onClick={() => setMobileOpen(false)} className="px-4 py-2 rounded-lg text-sm text-surface-300 hover:text-white hover:bg-white/5">
                     Connections
                   </Link>
+                  {user.role === 'admin' && (
+                    <Link href="/admin/analytics" onClick={() => setMobileOpen(false)} className="px-4 py-2 rounded-lg text-sm text-surface-300 hover:text-white hover:bg-white/5">
+                      Analytics
+                    </Link>
+                  )}
                   <button onClick={() => { logout(); setMobileOpen(false); }} className="text-left px-4 py-2 rounded-lg text-sm text-red-400 hover:bg-white/5">
                     Logout
                   </button>

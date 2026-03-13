@@ -8,6 +8,9 @@ const {
   toggleStartup,
   getSupporters,
   toggleSupporter,
+  getUserStats,
+  getConnectionStats,
+  getTagStats,
 } = require('../controllers/adminController');
 
 router.use(auth, role('admin'));
@@ -18,5 +21,10 @@ router.get('/startups', getStartups);
 router.put('/startups/:id/toggle', toggleStartup);
 router.get('/supporters', getSupporters);
 router.put('/supporters/:id/toggle', toggleSupporter);
+
+// Analytics
+router.get('/stats/users', getUserStats);
+router.get('/stats/connections', getConnectionStats);
+router.get('/stats/tags', getTagStats);
 
 module.exports = router;

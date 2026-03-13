@@ -19,6 +19,14 @@ const io = new Server(server, {
 });
 require('./config/socket')(io);
 
+// --------------- Passport (Social Login) ---------------
+try {
+  const passport = require('./config/passport');
+  app.use(passport.initialize());
+} catch (err) {
+  console.log('[Server] Passport not initialized:', err.message);
+}
+
 // --------------- Middleware ---------------
 app.use(
   cors({
@@ -39,6 +47,9 @@ app.use('/api/supporters', require('./routes/supporters'));
 app.use('/api/connections', require('./routes/connections'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/reviews', require('./routes/reviews'));
+app.use('/api/saved', require('./routes/saved'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check
 app.get('/api/health', (req, res) => {

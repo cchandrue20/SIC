@@ -1,6 +1,12 @@
 const Connection = require('../models/Connection');
 const StartupProfile = require('../models/StartupProfile');
 const SupporterProfile = require('../models/SupporterProfile');
+const Notification = require('../models/Notification');
+const {
+  sendConnectionRequestEmail,
+  sendConnectionAcceptedEmail,
+  sendConnectionRejectedEmail,
+} = require('../utils/emailService');
 
 // POST /api/connections  – supporter expresses interest in a startup
 exports.create = async (req, res) => {
@@ -14,7 +20,7 @@ exports.create = async (req, res) => {
     }
 
     // Verify startup exists
-    const startupProfile = await StartupProfile.findById(startupId);
+    const startupProfile = await StartupProfile.findById(startupId).populate('user', 'email');
     if (!startupProfile) {
       return res.status(404).json({ message: 'Startup not found' });
     }
@@ -38,6 +44,21 @@ exports.create = async (req, res) => {
       { path: 'startup', populate: { path: 'user', select: 'email' } },
       { path: 'supporter', populate: { path: 'user', select: 'email' } },
     ]);
+
+    // Send email notification to startup owner
+    sendConnectionRequestEmail(
+      startupProfile.user.email,
+      startupProfile.companyName,
+      supporterProfile.fullName
+    );
+
+    // Create in-app notification for startup owner
+    Notification.create({
+      user: startupProfile.user._id,
+      type: 'connection_request',
+      referenceId: connection._id,
+      message: `${supporterProfile.fullName} expressed interest in ${startupProfile.companyName}`,
+    }).catch(err => console.error('Notification error:', err.message));
 
     res.status(201).json(populated);
   } catch (err) {
@@ -110,6 +131,29 @@ exports.updateStatus = async (req, res) => {
       { path: 'startup', populate: { path: 'user', select: 'email' } },
       { path: 'supporter', populate: { path: 'user', select: 'email' } },
     ]);
+
+    // Send email and in-app notification to supporter
+    const supporterEmail = populated.supporter.user.email;
+    const startupName = populated.startup.companyName;
+    const supporterName = populated.supporter.fullName;
+
+    if (status === 'accepted') {
+      sendConnectionAcceptedEmail(supporterEmail, startupName, supporterName);
+      Notification.create({
+        user: populated.supporter.user._id,
+        type: 'connection_accepted',
+        referenceId: connection._id,
+        message: `${startupName} accepted your connection request`,
+      }).catch(err => console.error('Notification error:', err.message));
+    } else if (status === 'rejected') {
+      sendConnectionRejectedEmail(supporterEmail, startupName, supporterName);
+      Notification.create({
+        user: populated.supporter.user._id,
+        type: 'connection_rejected',
+        referenceId: connection._id,
+        message: `${startupName} declined your connection request`,
+      }).catch(err => console.error('Notification error:', err.message));
+    }
 
     res.json(populated);
   } catch (err) {

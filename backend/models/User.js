@@ -10,6 +10,12 @@ const userSchema = new mongoose.Schema(
       default: 'startup',
     },
     isActive: { type: Boolean, default: true },
+    // Password reset
+    resetPasswordToken: { type: String },
+    resetPasswordExpire: { type: Date },
+    // Ratings
+    averageRating: { type: Number, default: 0 },
+    reviewCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

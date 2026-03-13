@@ -38,6 +38,7 @@ export default function SupporterDashboard() {
             <p className="text-surface-400">Manage your profile and find startups</p>
           </div>
           <div className="flex gap-3 mt-4 sm:mt-0">
+            <Link href="/dashboard/supporter/wishlist" className="btn-secondary">💜 My Wishlist</Link>
             <Link href="/profile/supporter" className="btn-secondary">✏️ Edit Profile</Link>
             <Link href="/browse" className="btn-primary">🔍 Browse Startups</Link>
           </div>

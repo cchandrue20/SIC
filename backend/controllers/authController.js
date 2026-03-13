@@ -1,8 +1,10 @@
 const User = require('../models/User');
 const StartupProfile = require('../models/StartupProfile');
 const SupporterProfile = require('../models/SupporterProfile');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { generateToken, cookieOptions } = require('../utils/helpers');
+const { sendPasswordResetEmail } = require('../utils/emailService');
 
 // POST /api/auth/register
 exports.register = async (req, res) => {
@@ -93,6 +95,67 @@ exports.getMe = async (req, res) => {
       user: { id: user._id, email: user.email, role: user.role },
       profile,
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/forgot-password
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Don't reveal whether the email exists
+      return res.json({ message: 'If an account exists, a reset link has been sent.' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 60 * 60 * 1000; // 1 hour
+    await user.save();
+
+    const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+    await sendPasswordResetEmail(user.email, resetUrl);
+
+    res.json({ message: 'If an account exists, a reset link has been sent.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/reset-password/:token
+exports.resetPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.json({ message: 'Password reset successful. You can now log in.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

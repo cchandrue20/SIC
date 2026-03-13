@@ -7,69 +7,25 @@ import api from '@/lib/api';
 import Link from 'next/link';
 import ReviewList from '@/components/ReviewList';
 
-export default function StartupDetailPage() {
+export default function PublicStartupProfile() {
   const params = useParams();
   const { user } = useAuth();
   const [startup, setStartup] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [connectMsg, setConnectMsg] = useState('');
-  const [connecting, setConnecting] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [savingWishlist, setSavingWishlist] = useState(false);
 
   useEffect(() => {
     const fetchStartup = async () => {
       try {
         const { data } = await api.get(`/startups/${params.id}`);
         setStartup(data);
-      } catch (err) {
-        console.error('Failed to fetch startup');
+      } catch {
+        // silent
       } finally {
         setLoading(false);
       }
     };
     fetchStartup();
   }, [params.id]);
-
-  // Check if already saved (wishlist)
-  useEffect(() => {
-    if (user?.role === 'supporter') {
-      api.get('/saved').then(({ data }) => {
-        const found = data.some((s: any) => s.startup?._id === params.id);
-        setIsSaved(found);
-      }).catch(() => {});
-    }
-  }, [user, params.id]);
-
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      await api.post('/connections', { startupId: params.id, initialMessage: connectMsg });
-      setConnected(true);
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to connect');
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const toggleWishlist = async () => {
-    setSavingWishlist(true);
-    try {
-      if (isSaved) {
-        await api.delete(`/saved/${params.id}`);
-        setIsSaved(false);
-      } else {
-        await api.post('/saved', { startupId: params.id });
-        setIsSaved(true);
-      }
-    } catch (err: any) {
-      console.error(err.response?.data?.message || 'Wishlist error');
-    } finally {
-      setSavingWishlist(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -101,26 +57,7 @@ export default function StartupDetailPage() {
               {startup.companyName?.charAt(0)?.toUpperCase() || 'S'}
             </div>
             <div className="flex-1">
-              <div className="flex items-start justify-between">
-                <h1 className="text-2xl sm:text-3xl font-bold mb-1">{startup.companyName}</h1>
-                {user?.role === 'supporter' && (
-                  <button
-                    onClick={toggleWishlist}
-                    disabled={savingWishlist}
-                    className={`p-2 rounded-lg transition-all ${
-                      isSaved
-                        ? 'bg-pink-500/20 text-pink-400'
-                        : 'bg-white/5 text-surface-400 hover:text-pink-400 hover:bg-pink-500/10'
-                    }`}
-                    title={isSaved ? 'Remove from wishlist' : 'Save to wishlist'}
-                    id="wishlist-toggle"
-                  >
-                    <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                  </button>
-                )}
-              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-1">{startup.companyName}</h1>
               {startup.location && (
                 <p className="text-surface-400 flex items-center gap-1 text-sm">📍 {startup.location}</p>
               )}
@@ -144,7 +81,6 @@ export default function StartupDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {startup.description && (
               <div className="card animate-slide-up" style={{ animationDelay: '0.1s' }}>
@@ -152,14 +88,12 @@ export default function StartupDetailPage() {
                 <p className="text-surface-300 leading-relaxed whitespace-pre-wrap">{startup.description}</p>
               </div>
             )}
-
             {startup.pitch && (
               <div className="card animate-slide-up" style={{ animationDelay: '0.15s' }}>
                 <h2 className="text-lg font-semibold mb-3">Pitch</h2>
                 <p className="text-surface-300 leading-relaxed whitespace-pre-wrap">{startup.pitch}</p>
               </div>
             )}
-
             {startup.technicalHelp && (
               <div className="card animate-slide-up" style={{ animationDelay: '0.2s' }}>
                 <h2 className="text-lg font-semibold mb-3">Technical Help Needed</h2>
@@ -167,7 +101,7 @@ export default function StartupDetailPage() {
               </div>
             )}
 
-            {/* Reviews Section */}
+            {/* Reviews */}
             {startup.user && (
               <div className="card animate-slide-up" style={{ animationDelay: '0.25s' }}>
                 <h2 className="text-lg font-semibold mb-4">Reviews</h2>
@@ -176,14 +110,11 @@ export default function StartupDetailPage() {
             )}
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             {startup.fundingNeeded > 0 && (
               <div className="card animate-slide-up" style={{ animationDelay: '0.1s' }}>
                 <h3 className="text-sm font-semibold text-surface-300 mb-2">Funding Needed</h3>
-                <p className="text-3xl font-bold gradient-text">
-                  ${startup.fundingNeeded.toLocaleString()}
-                </p>
+                <p className="text-3xl font-bold gradient-text">${startup.fundingNeeded.toLocaleString()}</p>
               </div>
             )}
 
@@ -198,49 +129,17 @@ export default function StartupDetailPage() {
               </div>
             )}
 
-            {/* Public Profile Link */}
-            <div className="card animate-slide-up" style={{ animationDelay: '0.13s' }}>
-              <h3 className="text-sm font-semibold text-surface-300 mb-2">Share</h3>
-              <Link href={`/profile/startup/${params.id}`} className="text-primary-400 hover:text-primary-300 text-sm">
-                🔗 View Public Profile
-              </Link>
-            </div>
-
-            {/* Connect button for supporters */}
-            {user?.role === 'supporter' && (
+            {!user && (
               <div className="card animate-slide-up" style={{ animationDelay: '0.15s' }}>
-                <h3 className="text-sm font-semibold text-surface-300 mb-3">Interested?</h3>
-                {connected ? (
-                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm text-center">
-                    ✅ Connection request sent!
-                  </div>
-                ) : (
-                  <>
-                    <textarea
-                      value={connectMsg}
-                      onChange={e => setConnectMsg(e.target.value)}
-                      placeholder="Introduce yourself..."
-                      className="input-field text-sm mb-3 h-24 resize-none"
-                      id="connect-message"
-                    />
-                    <button
-                      onClick={handleConnect}
-                      disabled={connecting}
-                      className="btn-primary w-full"
-                      id="connect-button"
-                    >
-                      {connecting ? 'Sending...' : 'Express Interest'}
-                    </button>
-                  </>
-                )}
+                <p className="text-sm text-surface-400 mb-3">Log in to connect with this startup.</p>
+                <Link href="/login" className="btn-primary w-full text-center">Log In to Connect</Link>
               </div>
             )}
 
-            {!user && (
+            {user && (
               <div className="card animate-slide-up" style={{ animationDelay: '0.15s' }}>
-                <p className="text-sm text-surface-400 mb-3">Sign in as a supporter to connect with this startup.</p>
-                <Link href="/register?role=supporter" className="btn-primary w-full text-center">
-                  Join as Supporter
+                <Link href={`/browse/${params.id}`} className="btn-primary w-full text-center">
+                  View Full Details
                 </Link>
               </div>
             )}

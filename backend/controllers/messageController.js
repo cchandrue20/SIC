@@ -2,6 +2,8 @@ const Message = require('../models/Message');
 const Connection = require('../models/Connection');
 const StartupProfile = require('../models/StartupProfile');
 const SupporterProfile = require('../models/SupporterProfile');
+const Notification = require('../models/Notification');
+const { sendNewMessageEmail } = require('../utils/emailService');
 
 /**
  * Check if the requesting user is part of the connection.
@@ -60,7 +62,9 @@ exports.sendMessage = async (req, res) => {
     }
 
     // Only allow messages on accepted connections
-    const connection = await Connection.findById(connectionId);
+    const connection = await Connection.findById(connectionId)
+      .populate('startup', 'user companyName')
+      .populate('supporter', 'user fullName');
     if (!connection || connection.status !== 'accepted') {
       return res.status(400).json({ message: 'Connection must be accepted to send messages' });
     }
@@ -72,6 +76,36 @@ exports.sendMessage = async (req, res) => {
     });
 
     const populated = await message.populate('sender', 'email role');
+
+    // Determine recipient and send notification
+    const startupUserId = connection.startup.user.toString();
+    const supporterUserId = connection.supporter.user.toString();
+    const recipientUserId = req.user._id.toString() === startupUserId ? supporterUserId : startupUserId;
+    const senderName = req.user._id.toString() === startupUserId
+      ? connection.startup.companyName
+      : connection.supporter.fullName;
+
+    // In-app notification (fire and forget)
+    Notification.create({
+      user: recipientUserId,
+      type: 'new_message',
+      referenceId: connection._id,
+      message: `New message from ${senderName}: "${content.trim().substring(0, 50)}${content.trim().length > 50 ? '...' : ''}"`,
+    }).catch(err => console.error('Notification error:', err.message));
+
+    // Email notification (fire and forget)
+    const recipientEmail = req.user._id.toString() === startupUserId
+      ? connection.supporter.user.email || ''
+      : connection.startup.user.email || '';
+    // Note: We need to get the actual email, but user field was only populated with _id
+    // So we fetch separately if needed
+    const User = require('../models/User');
+    User.findById(recipientUserId).select('email').then(recipientUser => {
+      if (recipientUser) {
+        sendNewMessageEmail(recipientUser.email, senderName, content.trim());
+      }
+    }).catch(() => {});
+
     res.status(201).json(populated);
   } catch (err) {
     res.status(500).json({ message: err.message });

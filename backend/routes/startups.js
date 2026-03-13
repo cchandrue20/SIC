@@ -10,8 +10,10 @@ const {
   remove,
   uploadLogo,
   uploadPitchDeck,
+  getTagsList,
 } = require('../controllers/startupController');
 
+router.get('/tags/list', getTagsList);
 router.get('/', getAll);
 router.get('/:id', getOne);
 router.post('/', auth, role('startup'), create);

@@ -17,6 +17,7 @@ const startupProfileSchema = new mongoose.Schema(
     location: { type: String, default: '' },
     logo: { type: String, default: '' },
     pitchDeck: { type: String, default: '' },
+    tags: [{ type: String, trim: true }],
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

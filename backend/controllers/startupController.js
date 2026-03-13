@@ -3,7 +3,7 @@ const StartupProfile = require('../models/StartupProfile');
 // GET /api/startups
 exports.getAll = async (req, res) => {
   try {
-    const { search, location, fundingMin, fundingMax, technicalHelp } = req.query;
+    const { search, location, fundingMin, fundingMax, technicalHelp, tags } = req.query;
     const filter = { isActive: true };
 
     if (search) {
@@ -25,9 +25,16 @@ exports.getAll = async (req, res) => {
     if (technicalHelp) {
       filter.technicalHelp = { $regex: technicalHelp, $options: 'i' };
     }
+    // Feature 2: Filter by tags (comma-separated)
+    if (tags) {
+      const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean);
+      if (tagArray.length > 0) {
+        filter.tags = { $in: tagArray };
+      }
+    }
 
     const startups = await StartupProfile.find(filter)
-      .populate('user', 'email')
+      .populate('user', 'email averageRating reviewCount')
       .sort({ createdAt: -1 });
 
     res.json(startups);
@@ -39,7 +46,7 @@ exports.getAll = async (req, res) => {
 // GET /api/startups/:id
 exports.getOne = async (req, res) => {
   try {
-    const startup = await StartupProfile.findById(req.params.id).populate('user', 'email');
+    const startup = await StartupProfile.findById(req.params.id).populate('user', 'email averageRating reviewCount');
     if (!startup) return res.status(404).json({ message: 'Startup not found' });
     res.json(startup);
   } catch (err) {
@@ -127,6 +134,16 @@ exports.uploadPitchDeck = async (req, res) => {
     profile.pitchDeck = `/uploads/${req.file.filename}`;
     await profile.save();
     res.json({ pitchDeck: profile.pitchDeck });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/startups/tags/list – get all unique tags
+exports.getTagsList = async (req, res) => {
+  try {
+    const tags = await StartupProfile.distinct('tags', { isActive: true });
+    res.json(tags.filter(Boolean).sort());
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

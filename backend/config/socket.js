@@ -1,8 +1,12 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Message = require('../models/Message');
+const Notification = require('../models/Notification');
 
 module.exports = (io) => {
+  // Make io accessible for emitting notifications from controllers
+  global._io = io;
+
   // Authenticate socket connections via JWT
   io.use(async (socket, next) => {
     try {
@@ -20,6 +24,9 @@ module.exports = (io) => {
 
   io.on('connection', (socket) => {
     console.log('User connected:', socket.user.email);
+
+    // Join user's personal room for notifications
+    socket.join(`user:${socket.user._id}`);
 
     // Join a connection/chat room
     socket.on('join', (connectionId) => {
@@ -43,6 +50,30 @@ module.exports = (io) => {
         });
         const populated = await message.populate('sender', 'email role');
         io.to(connectionId).emit('newMessage', populated);
+
+        // Create notification for the other user in the connection
+        const Connection = require('../models/Connection');
+        const connection = await Connection.findById(connectionId)
+          .populate('startup', 'user companyName')
+          .populate('supporter', 'user fullName');
+        if (connection) {
+          const startupUserId = connection.startup.user.toString();
+          const supporterUserId = connection.supporter.user.toString();
+          const recipientUserId = socket.user._id.toString() === startupUserId ? supporterUserId : startupUserId;
+          const senderName = socket.user._id.toString() === startupUserId
+            ? connection.startup.companyName
+            : connection.supporter.fullName;
+
+          const notification = await Notification.create({
+            user: recipientUserId,
+            type: 'new_message',
+            referenceId: connection._id,
+            message: `New message from ${senderName}`,
+          });
+
+          // Emit real-time notification
+          io.to(`user:${recipientUserId}`).emit('newNotification', notification);
+        }
       } catch (err) {
         socket.emit('error', { message: 'Failed to send message' });
       }
