@@ -20,6 +20,16 @@ exports.updateUser = async (req, res) => {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Prevent self-deactivation or self-role change
+    if (req.params.id === req.user._id.toString()) {
+      if (typeof isActive === 'boolean' && isActive === false) {
+        return res.status(400).json({ message: 'You cannot deactivate your own admin account.' });
+      }
+      if (role && role !== user.role) {
+        return res.status(400).json({ message: 'You cannot change your own role.' });
+      }
+    }
+
     if (role) user.role = role;
     if (typeof isActive === 'boolean') user.isActive = isActive;
     await user.save();
@@ -29,6 +39,7 @@ exports.updateUser = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // GET /api/admin/startups
 exports.getStartups = async (req, res) => {

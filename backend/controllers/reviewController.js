@@ -87,6 +87,20 @@ exports.create = async (req, res) => {
   }
 };
 
+// GET /api/reviews (list all reviews)
+exports.getAll = async (req, res) => {
+  try {
+    const reviews = await Review.find()
+      .populate('fromUser', 'email')
+      .populate('toUser', 'email')
+      .sort({ createdAt: -1 });
+
+    res.json(reviews);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/reviews/user/:userId
 exports.getByUser = async (req, res) => {
   try {

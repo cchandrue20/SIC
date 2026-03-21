@@ -19,13 +19,6 @@ const io = new Server(server, {
 });
 require('./config/socket')(io);
 
-// --------------- Passport (Social Login) ---------------
-try {
-  const passport = require('./config/passport');
-  app.use(passport.initialize());
-} catch (err) {
-  console.log('[Server] Passport not initialized:', err.message);
-}
 
 // --------------- Middleware ---------------
 app.use(
@@ -50,10 +43,31 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/saved', require('./routes/saved'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/test', require('./routes/test'));
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// MongoDB connection check
+app.get('/api/db-check', (req, res) => {
+  const mongoose = require('mongoose');
+  const mongooseState = mongoose.connection.readyState;
+  // 0: disconnected, 1: connected, 2: connecting, 3: disconnecting
+  const states = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+  
+  res.json({
+    mongodb: states[mongooseState],
+    connected: mongooseState === 1,
+    timestamp: new Date().toISOString(),
+    readyState: mongooseState
+  });
 });
 
 // --------------- Start ---------------

@@ -122,4 +122,8 @@
   .status-rejected {
     @apply status-badge bg-red-500/10 text-red-400 border border-red-500/20;
   }
+
+  .status-disputed {
+    @apply status-badge bg-amber-500/10 text-amber-400 border border-amber-500/20;
+  }
 }
