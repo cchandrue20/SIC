@@ -43,7 +43,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/saved', require('./routes/saved'));
 app.use('/api/notifications', require('./routes/notifications'));
-app.use('/api/test', require('./routes/test'));
+app.use('/api', require('./routes/expensePlan'));
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -18,6 +18,14 @@ const startupProfileSchema = new mongoose.Schema(
     logo: { type: String, default: '' },
     pitchDeck: { type: String, default: '' },
     tags: [{ type: String, trim: true }],
+    investmentNeeded: { type: Number, default: 0 },
+    stage: {
+      type: String,
+      enum: ['Idea', 'MVP', 'Revenue'],
+      default: 'Idea',
+    },
+    equity: { type: Number, default: 0 }, // percentage
+    traction: { type: String, default: '' }, // one-liner
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

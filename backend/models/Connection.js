@@ -18,6 +18,7 @@ const connectionSchema = new mongoose.Schema(
       default: 'pending',
     },
     initialMessage: { type: String, default: '' },
+    interestedAmount: { type: Number, default: 0 }, // amount supporter is willing to invest
   },
   { timestamps: true }
 );

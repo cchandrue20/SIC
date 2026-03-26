@@ -2,38 +2,61 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import api from '@/lib/api';
+import api, { getExpensePlan, getFundingProgress, updateActualExpense } from '@/lib/api';
 import Link from 'next/link';
 import ReviewList from '@/components/ReviewList';
-
-/** Tab identifiers for the dashboard */
+import FundingProgress from '@/components/FundingProgress';
+import ExpensePlanTable from '@/components/ExpensePlanTable';
 
 export default function StartupDashboard() {
   const { user, profile } = useAuth();
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('connections');
+  const [expensePlan, setExpensePlan] = useState([]);
+  const [fundingStats, setFundingStats] = useState(null);
 
   useEffect(() => {
-    const fetchConnections = async () => {
+    const fetchDashboardData = async () => {
+      if (!profile?._id) return;
       try {
-        const { data } = await api.get('/connections');
-        setConnections(data);
+        const [connRes, planRes, statsRes] = await Promise.all([
+          api.get('/connections'),
+          getExpensePlan(profile._id),
+          getFundingProgress(profile._id)
+        ]);
+        setConnections(connRes.data);
+        setExpensePlan(planRes.data);
+        setFundingStats(statsRes.data);
       } catch (err) {
-        console.error('Failed to fetch connections');
+        console.error('Failed to fetch dashboard data');
       } finally {
         setLoading(false);
       }
     };
-    fetchConnections();
-  }, []);
+    fetchDashboardData();
+  }, [profile]);
 
   const handleStatus = async (id, status) => {
     try {
       await api.put(`/connections/${id}`, { status });
       setConnections(prev => prev.map(c => c._id === id ? { ...c, status } : c));
+      // Refresh funding progress if a connection was accepted
+      if (status === 'accepted') {
+        const { data } = await getFundingProgress(profile._id);
+        setFundingStats(data);
+      }
     } catch (err) {
       console.error('Failed to update connection');
+    }
+  };
+
+  const handleUpdateActual = async (planId, actualAmount) => {
+    try {
+      await updateActualExpense(profile._id, planId, actualAmount);
+      setExpensePlan(prev => prev.map(item => item._id === planId ? { ...item, actualAmount } : item));
+    } catch (err) {
+      console.error('Failed to update actual spend');
     }
   };
 
@@ -42,6 +65,7 @@ export default function StartupDashboard() {
 
   const tabs = [
     { key: 'connections', label: 'Connections', icon: '🤝' },
+    { key: 'investment', label: 'Investment & Funding', icon: '💰' },
     { key: 'reviews', label: 'Reviews', icon: '⭐' },
   ];
 
@@ -63,17 +87,32 @@ export default function StartupDashboard() {
         {/* Profile Summary */}
         {profile ? (
           <div className="card mb-8 animate-slide-up">
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-600 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
-                {profile.companyName?.charAt(0)?.toUpperCase() || 'S'}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-600 flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
+                  {profile.companyName?.charAt(0)?.toUpperCase() || 'S'}
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">{profile.companyName}</h2>
+                  <p className="text-sm text-surface-400">{profile.location || 'No location set'}</p>
+                  <div className="flex gap-2 mt-2">
+                     <span className="px-2 py-0.5 rounded-lg bg-primary-500/10 text-primary-400 text-[10px] font-bold border border-primary-500/20">{profile.stage}</span>
+                     <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">₹{profile.investmentNeeded?.toLocaleString('en-IN')} Target</span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-semibold">{profile.companyName}</h2>
-                <p className="text-sm text-surface-400">{profile.location || 'No location set'}</p>
-                {profile.fundingNeeded > 0 && (
-                  <p className="text-sm text-emerald-400 mt-1">💰 ₹{profile.fundingNeeded.toLocaleString('en-IN')} needed</p>
-                )}
-              </div>
+              
+              {fundingStats && (
+                <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
+                  <div className="text-right">
+                    <p className="text-[10px] text-surface-400 uppercase font-bold">Funding Progress</p>
+                    <p className="text-lg font-bold text-emerald-400">{fundingStats.percentage.toFixed(1)}%</p>
+                  </div>
+                  <div className="w-24 h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500" style={{ width: `${fundingStats.percentage}%` }} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -86,12 +125,12 @@ export default function StartupDashboard() {
         )}
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 mb-8 p-1 bg-white/5 rounded-2xl border border-white/10 animate-slide-up">
+        <div className="flex gap-1 mb-8 p-1 bg-white/5 rounded-2xl border border-white/10 animate-slide-up overflow-x-auto">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 min-w-[150px] ${
                 activeTab === tab.key
                   ? 'bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg shadow-primary-500/25'
                   : 'text-surface-400 hover:text-white hover:bg-white/5'
@@ -123,14 +162,14 @@ export default function StartupDashboard() {
             {/* Pending Requests */}
             {pending.length > 0 && (
               <div className="mb-8 animate-slide-up">
-                <h2 className="text-lg font-semibold mb-4">Pending Requests</h2>
+                <h2 className="text-lg font-semibold mb-4 text-surface-200">Pending Requests</h2>
                 <div className="space-y-3">
                   {pending.map(conn => (
                     <div key={conn._id} className="glass-hover p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div>
-                        <p className="font-medium">{conn.supporter?.fullName || 'Supporter'}</p>
+                        <p className="font-medium text-surface-100">{conn.supporter?.fullName || 'Supporter'}</p>
                         <p className="text-sm text-surface-400 capitalize">{conn.supporter?.type?.replace('_', ' ')}</p>
-                        {conn.initialMessage && <p className="text-sm text-surface-300 mt-1">&ldquo;{conn.initialMessage}&rdquo;</p>}
+                        {conn.initialMessage && <p className="text-sm text-surface-300 mt-1 italic">&ldquo;{conn.initialMessage}&rdquo;</p>}
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => handleStatus(conn._id, 'accepted')} className="btn-primary text-xs px-4 py-2">Accept</button>
@@ -145,16 +184,21 @@ export default function StartupDashboard() {
             {/* Active Connections */}
             {accepted.length > 0 && (
               <div className="animate-slide-up">
-                <h2 className="text-lg font-semibold mb-4">Active Connections</h2>
-                <div className="space-y-3">
+                <h2 className="text-lg font-semibold mb-4 text-surface-200">Active Connections</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {accepted.map(conn => (
                     <Link key={conn._id} href={`/connections/${conn._id}`} className="block">
                       <div className="glass-hover p-5 flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{conn.supporter?.fullName || 'Supporter'}</p>
-                          <p className="text-sm text-surface-400 capitalize">{conn.supporter?.type?.replace('_', ' ')}</p>
+                        <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 rounded-xl bg-primary-500/20 text-primary-400 flex items-center justify-center text-sm font-bold">
+                             {conn.supporter?.fullName?.charAt(0) || 'S'}
+                           </div>
+                           <div>
+                            <p className="font-medium text-surface-100">{conn.supporter?.fullName || 'Supporter'}</p>
+                            <p className="text-[10px] text-surface-400 uppercase tracking-wider">{conn.supporter?.type?.replace('_', ' ')}</p>
+                           </div>
                         </div>
-                        <span className="status-accepted">Connected</span>
+                        <span className="status-badge bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Chat</span>
                       </div>
                     </Link>
                   ))}
@@ -164,10 +208,37 @@ export default function StartupDashboard() {
           </div>
         )}
 
+        {/* Investment Tab */}
+        {activeTab === 'investment' && (
+          <div className="animate-fade-in space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                {fundingStats && (
+                  <FundingProgress 
+                    investmentNeeded={fundingStats.investmentNeeded}
+                    totalInterested={fundingStats.totalInterested}
+                    investors={fundingStats.investors}
+                  />
+                )}
+              </div>
+              <div className="lg:col-span-2">
+                <div className="card">
+                  <h2 className="text-lg font-semibold mb-4 text-surface-100">Investment Utilization Plan</h2>
+                  <ExpensePlanTable 
+                    plan={expensePlan} 
+                    editable={true} 
+                    onUpdateActual={handleUpdateActual} 
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Reviews Tab */}
         {activeTab === 'reviews' && user && (
           <div className="animate-fade-in">
-            <h2 className="text-lg font-semibold mb-4">⭐ Your Reviews</h2>
+            <h2 className="text-lg font-semibold mb-4 text-surface-200">⭐ Your Reviews</h2>
             <div className="card">
               <ReviewList userId={user.id} />
             </div>
@@ -177,3 +248,4 @@ export default function StartupDashboard() {
     </div>
   );
 }
+
